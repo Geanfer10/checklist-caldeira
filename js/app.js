@@ -4,9 +4,9 @@
 import {
   configurado, db, auth, collection, doc, getDoc, updateDoc, writeBatch, serverTimestamp,
   onSnapshot, signInWithEmailAndPassword, signOut, onAuthStateChanged
-} from './firebase.js?v=20261106b';
-import { CHECKLIST } from './checklist-838t.js?v=20261106b';
-import { turnoDe, TURNOS } from './turnos.js?v=20261106b';
+} from './firebase.js?v=20261106c';
+import { CHECKLIST } from './checklist-838t.js?v=20261106c';
+import { turnoDe, TURNOS } from './turnos.js?v=20261106c';
 
 const EQ = CHECKLIST.equipamento;
 const ETAPAS = [{ id: 'abertura', titulo: 'Abertura do turno', tipo: 'abertura' }, ...CHECKLIST.etapas];
@@ -14,6 +14,7 @@ const PNEUS = CHECKLIST.pneus;
 const LBL = { ok: 'OK', a: 'Atenção', c: 'Crítico' };
 const INATIVIDADE_MIN = 10;       // volta para a matrícula após 10 min parado
 const SEG_VOLTAR = 8;             // segundos na tela "Enviado"
+const VERSAO = '20261106c';            // igual ao versao.json; troque os dois ao publicar mudanças
 
 let S;                            // estado da inspeção em andamento
 let USER = null, PERFIL = null;   // conta do tablet
@@ -366,6 +367,14 @@ document.addEventListener('submit', async e => {
   try { await signInWithEmailAndPassword(auth, document.getElementById('em').value.trim(), document.getElementById('pw').value); }
   catch (err) { ERRO_LOGIN = 'E-mail ou senha incorretos, ou sem internet.'; render(); }
 });
+// atualização automática: se houver versão nova publicada e o tablet estiver livre na tela de matrícula, recarrega
+setInterval(async () => {
+  try {
+    const r = await fetch('versao.json?t=' + Date.now(), { cache: 'no-store' });
+    const { versao } = await r.json();
+    if (versao && versao !== VERSAO && TELA === 'matricula' && !S.mat && !S.matOk) location.replace('./?v=' + versao);
+  } catch { }
+}, 300000);
 // volta para a matrícula se o tablet ficar parado no meio de uma inspeção
 setInterval(() => {
   if (['inicio', 'etapa', 'resumo'].includes(TELA) || (TELA === 'matricula' && (S.matOk || S.mat)))

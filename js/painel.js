@@ -4,9 +4,9 @@
 import {
   configurado, db, auth, collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp,
   query, where, onSnapshot, Timestamp, signInWithEmailAndPassword, signOut, onAuthStateChanged
-} from './firebase.js?v=20261106b';
-import { CHECKLIST, itensAvaliados, rotinas } from './checklist-838t.js?v=20261106b';
-import { TURNOS, LISTA_TURNOS, iso, deIso, somaDias, inicioTurno, fimTurno } from './turnos.js?v=20261106b';
+} from './firebase.js?v=20261106c';
+import { CHECKLIST, itensAvaliados, rotinas } from './checklist-838t.js?v=20261106c';
+import { TURNOS, LISTA_TURNOS, iso, deIso, somaDias, inicioTurno, fimTurno } from './turnos.js?v=20261106c';
 
 const EQ = CHECKLIST.equipamento;
 const DAY = 86400000;

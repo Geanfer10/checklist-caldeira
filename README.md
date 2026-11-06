@@ -87,7 +87,7 @@ Custo: **R$ 0**. Usa GitHub Pages para hospedar o site e Firebase (plano gratuit
 
 Toda alteração enviada ao GitHub é publicada sozinha em 1 a 2 minutos. No tablet, basta fechar e abrir o app.
 
-**Versão dos arquivos:** os endereços dos scripts terminam em `?v=AAAAMMDDx` (em `index.html`, `painel/index.html` e nos `import` dos arquivos `js/`). Ao publicar uma alteração, troque esse número em todos eles: isso obriga os navegadores a baixar a versão nova em vez de usar a guardada em cache.
+**Versão dos arquivos:** os endereços dos scripts terminam em `?v=AAAAMMDDx` (em `index.html`, `painel/index.html` e nos `import` dos arquivos `js/`). Ao publicar uma alteração, troque esse número em todos eles **e também** em `versao.json` e na constante `VERSAO` do `js/app.js`. O tablet consulta o `versao.json` a cada 5 minutos e, quando a versão muda e ele está livre na tela de matrícula, recarrega sozinho.
 
 **Importante:** não mude o `id` de um item que já tem histórico. Para trocar o texto que aparece, mude só o `rotulo`.
 
