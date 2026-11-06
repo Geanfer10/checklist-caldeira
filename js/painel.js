@@ -27,7 +27,7 @@ const ico = {
 let USER = null, PERFIL = null, NOME = '', ERRO = '', TELA = 'carregando';
 let INS = new Map(), NC = new Map(), NC_ABERTAS = new Map(), COL = new Map();
 let DIA_CACHE = {}, FOTOS = {};
-let D = { periodo: 14, aba: 'painel', tab: 'abertas', osEdit: null, osVal: '', det: null, dia: somaDias(iso(new Date()), -1), msg: '' };
+let D = { periodo: 14, aba: 'painel', tab: 'abertas', osEdit: null, osVal: '', det: null, dia: iso(new Date()), msg: '' };
 let unsubs = [], unsubPeriodo = [];
 
 const hoje = () => iso(new Date());
