@@ -4,9 +4,9 @@
 import {
   configurado, db, auth, collection, doc, getDoc, updateDoc, writeBatch, serverTimestamp,
   onSnapshot, signInWithEmailAndPassword, signOut, onAuthStateChanged
-} from './firebase.js';
-import { CHECKLIST } from './checklist-838t.js';
-import { turnoDe, TURNOS } from './turnos.js';
+} from './firebase.js?v=20261106b';
+import { CHECKLIST } from './checklist-838t.js?v=20261106b';
+import { turnoDe, TURNOS } from './turnos.js?v=20261106b';
 
 const EQ = CHECKLIST.equipamento;
 const ETAPAS = [{ id: 'abertura', titulo: 'Abertura do turno', tipo: 'abertura' }, ...CHECKLIST.etapas];
