@@ -1,15 +1,14 @@
 // =====================================================================
-//  CONFIGURAÇÃO DO FIREBASE
-//  Cole aqui os dados do seu projeto Firebase (passo 2 do README).
+//  CONFIGURAÇÃO DO FIREBASE (projeto checklist-caldeira)
 //  Firebase console > Configurações do projeto > Seus apps > Configuração do SDK
 //  Estes dados NÃO são senha: podem ficar no GitHub. Quem protege os dados
 //  são as regras do arquivo firestore.rules.
 // =====================================================================
 export const firebaseConfig = {
-  apiKey: "COLE_AQUI",
-  authDomain: "COLE_AQUI",
-  projectId: "COLE_AQUI",
-  storageBucket: "COLE_AQUI",
-  messagingSenderId: "COLE_AQUI",
-  appId: "COLE_AQUI"
+  apiKey: "AIzaSyCqmszePXi3AwwPVtS7nnyINLeoULSG2gA",
+  authDomain: "checklist-caldeira-b2ae9.firebaseapp.com",
+  projectId: "checklist-caldeira-b2ae9",
+  storageBucket: "checklist-caldeira-b2ae9.firebasestorage.app",
+  messagingSenderId: "1038594476383",
+  appId: "1:1038594476383:web:1ea8152b9145ec2d5f4eea"
 };
