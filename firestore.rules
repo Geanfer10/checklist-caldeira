@@ -1,0 +1,72 @@
+rules_version = '2';
+// =====================================================================
+//  REGRAS DE SEGURANÇA DO BANCO (Firestore)
+//  Cole este conteúdo em: Firebase console > Firestore Database > Regras > Publicar
+//
+//  Perfis (definidos na coleção "usuarios", um documento por conta):
+//   - tablet     : grava inspeções; NÃO lê histórico nem não conformidades
+//   - supervisor : lê tudo no painel e atualiza a situação das não conformidades
+//   - admin      : tudo do supervisor + cadastra colaboradores
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logado() { return request.auth != null; }
+    function perfil() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil;
+    }
+    function ehTablet()     { return logado() && perfil() in ['tablet', 'admin']; }
+    function ehSupervisor() { return logado() && perfil() in ['supervisor', 'admin']; }
+    function ehAdmin()      { return logado() && perfil() == 'admin'; }
+
+    // Contas e perfis: cada um lê o próprio; só o admin altera (ou pelo console).
+    match /usuarios/{uid} {
+      allow read: if logado() && (request.auth.uid == uid || ehAdmin());
+      allow write: if ehAdmin();
+    }
+
+    // Matrículas habilitadas no tablet.
+    match /colaboradores/{matricula} {
+      allow read: if ehTablet() || ehSupervisor();
+      allow write: if ehAdmin();
+    }
+
+    // Inspeções: o tablet só CRIA. Ninguém edita depois de enviada.
+    match /inspecoes/{id} {
+      allow create: if ehTablet()
+        && request.resource.data.criadoPor == request.auth.uid
+        && request.resource.data.criadoEm == request.time
+        && request.resource.data.operador.matricula is string
+        && request.resource.data.horimetro is number;
+      allow read: if ehSupervisor();
+      allow update: if false;
+      allow delete: if ehAdmin();
+    }
+
+    // Não conformidades: o tablet cria como "aberta"; o supervisor só muda a situação.
+    match /naoConformidades/{id} {
+      allow create: if ehTablet()
+        && request.resource.data.status == 'aberta'
+        && request.resource.data.criadoPor == request.auth.uid
+        && request.resource.data.criadoEm == request.time;
+      allow read: if ehSupervisor();
+      allow update: if ehSupervisor()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'os', 'atualizadoEm', 'atualizadoPor'])
+        && request.resource.data.status in ['aberta', 'os', 'resolvida'];
+      allow delete: if ehAdmin();
+    }
+
+    // Fotos dos problemas (comprimidas, guardadas à parte).
+    match /fotos/{id} {
+      allow create: if ehTablet() && request.resource.data.criadoPor == request.auth.uid;
+      allow read: if ehSupervisor();
+      allow delete: if ehAdmin();
+    }
+
+    // Resumo da última inspeção (mostrado na tela inicial do tablet).
+    match /status/{equipamento} {
+      allow read: if ehTablet() || ehSupervisor();
+      allow write: if ehTablet();
+    }
+  }
+}
