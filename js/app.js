@@ -2,7 +2,7 @@
 //  APP DO TABLET — checklist da Pá Mecânica 838T
 // =====================================================================
 import {
-  configurado, db, auth, collection, doc, getDoc, writeBatch, serverTimestamp,
+  configurado, db, auth, collection, doc, getDoc, updateDoc, writeBatch, serverTimestamp,
   onSnapshot, signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from './firebase.js';
 import { CHECKLIST } from './checklist-838t.js';
@@ -236,8 +236,13 @@ async function enviar() {
     operador, horimetro: Number(S.hor), respostas: resp, pneus, rotinas: rot,
     observacoes: S.obsg.trim(), contagem: { ok: t.ok, a: t.a, c: t.c }, status, problemas
   });
+  const paraMonday = [];
+  const horimetro = Number(S.hor);
   problemas.forEach(p => {
-    lote.set(doc(collection(db, 'naoConformidades')), {
+    const ncRef = doc(collection(db, 'naoConformidades'));
+    paraMonday.push({ ncId: ncRef.id, rotulo: p.rotulo, gravidade: p.s, descricao: p.obs, grupo: p.grupo, turno, dataTurno,
+      operador: `${operador.nome} (${operador.matricula})`, horimetro, inspecaoId: insRef.id, temFoto: !!p.fotoId });
+    lote.set(ncRef, {
       inspecaoId: insRef.id, equipamento: EQ, dataTurno, turno, item: p.item, rotulo: p.rotulo, grupo: p.grupo,
       gravidade: p.s, descricao: p.obs, fotoId: p.fotoId, operador,
       criadoEm: serverTimestamp(), criadoPor: uid, status: 'aberta', os: ''
@@ -252,11 +257,39 @@ async function enviar() {
     const box = document.createElement('div'); box.className = 'warn'; box.textContent = 'Não foi possível enviar (permissão negada). Avise o administrador.';
     document.getElementById('rolagem')?.prepend(box); return;
   }
+  if (paraMonday.length) enviarMonday(paraMonday);
   ENVIO = { quando: agora, nome: S.nome, bloq: t.c > 0, fila: r === 'fila' || !navigator.onLine, seg: SEG_VOLTAR };
   novo(); irPara('enviado');
   clearInterval(timerVoltar);
   timerVoltar = setInterval(() => { ENVIO.seg--; if (ENVIO.seg <= 0) voltarMatricula(); else if (TELA === 'enviado') render(); }, 1000);
 }
+
+// ---------------------------------------------------------------- Monday
+// As não conformidades vão para o Monday por meio do "carteiro" no Google Apps Script
+// (ver pasta integracao/). Se a internet falhar, ficam numa fila no tablet e são reenviadas.
+let MONDAY = null;
+let filaMonday = [];
+try { filaMonday = JSON.parse(localStorage.getItem('filaMonday') || '[]'); } catch { filaMonday = []; }
+const salvarFila = () => { try { localStorage.setItem('filaMonday', JSON.stringify(filaMonday)); } catch { } };
+async function enviarMonday(itens) {
+  if (!MONDAY?.ativo || !MONDAY.url || !MONDAY.segredo) {
+    itens.forEach(i => { if (!filaMonday.find(f => f.ncId === i.ncId)) filaMonday.push(i); }); salvarFila(); return;
+  }
+  try {
+    const r = await fetch(MONDAY.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ segredo: MONDAY.segredo, itens }) });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.erro || 'falha no carteiro');
+    for (const x of j.res || []) {
+      const dados = x.mondayId ? { mondayId: String(x.mondayId), mondayUrl: `${j.url}/pulses/${x.mondayId}` } : { mondayErro: String(x.erro || 'erro').slice(0, 300) };
+      await updateDoc(doc(db, 'naoConformidades', x.ncId), dados).catch(e => console.warn(e));
+    }
+    filaMonday = filaMonday.filter(f => !itens.find(i => i.ncId === f.ncId)); salvarFila();
+  } catch (e) {
+    console.warn('Monday: ficou na fila para reenvio', e);
+    itens.forEach(i => { if (!filaMonday.find(f => f.ncId === i.ncId)) filaMonday.push(i); }); salvarFila();
+  }
+}
+setInterval(() => { if (filaMonday.length && navigator.onLine && MONDAY?.ativo) enviarMonday(filaMonday.slice()); }, 180000);
 
 // ---------------------------------------------------------------- fotos
 function comprimir(arquivo) {
@@ -350,6 +383,10 @@ else onAuthStateChanged(auth, async user => {
   } catch (err) { PERFIL = null; }
   if (!['tablet', 'admin'].includes(PERFIL)) { irPara('semPermissao'); return; }
   unsubs.push(onSnapshot(collection(db, 'colaboradores'), snap => { COLAB = {}; snap.forEach(d => { COLAB[d.id] = d.data(); }); }));
+  unsubs.push(onSnapshot(doc(db, 'config', 'monday'), snap => {
+    MONDAY = snap.exists() ? snap.data() : null;
+    if (filaMonday.length && MONDAY?.ativo) enviarMonday(filaMonday.slice());
+  }, () => { MONDAY = null; }));
   unsubs.push(onSnapshot(doc(db, 'status', EQ), snap => { STATUS = snap.exists() ? snap.data() : null; if (TELA === 'inicio') render(); }));
   voltarMatricula();
 });

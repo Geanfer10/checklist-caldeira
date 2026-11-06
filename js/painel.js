@@ -26,7 +26,7 @@ const ico = {
 
 let USER = null, PERFIL = null, NOME = '', ERRO = '', TELA = 'carregando';
 let INS = new Map(), NC = new Map(), NC_ABERTAS = new Map(), COL = new Map();
-let DIA_CACHE = {}, FOTOS = {};
+let DIA_CACHE = {}, FOTOS = {}, MONDAY = null, MONDAY_ENVIANDO = new Set();
 let D = { periodo: 14, aba: 'painel', tab: 'abertas', osEdit: null, osVal: '', det: null, dia: iso(new Date()), msg: '' };
 let unsubs = [], unsubPeriodo = [];
 
@@ -50,6 +50,7 @@ function assinarFixos() {
   unsubs.push(onSnapshot(query(collection(db, 'naoConformidades'), where('status', 'in', ['aberta', 'os'])), s => {
     NC_ABERTAS = new Map(); s.forEach(d => NC_ABERTAS.set(d.id, lerDoc(d))); render();
   }, erro));
+  unsubs.push(onSnapshot(doc(db, 'config', 'monday'), s => { MONDAY = s.exists() ? s.data() : null; render(); }, () => { MONDAY = null; }));
   unsubs.push(onSnapshot(collection(db, 'colaboradores'), s => {
     COL = new Map(); s.forEach(d => COL.set(d.id, d.data())); if (D.aba === 'colaboradores') render();
   }, erro));
@@ -86,7 +87,7 @@ function cabecalho() {
   return `<div class="dhead"><div class="ttl"><small>GOIÁS VERDE · PCM LUZIÂNIA</small><span>Painel de inspeções · ${esc(CHECKLIST.nome)}</span></div>
   <div class="dctl">
    <button class="dbtn ${D.aba === 'painel' ? 'on' : ''}" data-act="aba" data-to="painel">Painel</button>
-   <button class="dbtn ${D.aba === 'colaboradores' ? 'on' : ''}" data-act="aba" data-to="colaboradores">Colaboradores</button>
+   <button class="dbtn ${D.aba === 'colaboradores' ? 'on' : ''}" data-act="aba" data-to="colaboradores">Configurações</button>
    ${D.aba === 'painel' ? `<label for="per">Período</label><select id="per" data-in="periodo">${[7, 14, 30, 60, 90].map(n => `<option value="${n}" ${D.periodo === n ? 'selected' : ''}>Últimos ${n} dias</option>`).join('')}</select>
    <button class="dbtn" data-act="excel">${ico.dl}Exportar Excel</button>` : ''}
    <span class="quem">${esc(NOME || USER.email)}</span><button class="dbtn" data-act="sair">Sair</button></div></div>
@@ -143,7 +144,9 @@ function tPainel() {
   const qt = k => ncs.filter(filtros[k]).length;
   const linhaNC = n => `<tr><td style="white-space:nowrap">${dm(quando(n))} ${hm(quando(n))}<br><span style="color:var(--mut);font-size:12px">Turno ${esc(n.turno)}</span></td>
    <td><span class="pill ${n.gravidade === 'c' ? 'p-c' : 'p-a'}">${n.gravidade === 'c' ? 'CRÍTICO' : 'ATENÇÃO'}</span></td>
-   <td><b>${esc(n.rotulo)}</b><br><span style="color:var(--mut)">${esc(n.descricao)}</span>${n.fotoId ? ` · <button class="sbtn" data-act="det" data-id="${n.inspecaoId}">ver foto</button>` : ''}</td>
+   <td><b>${esc(n.rotulo)}</b><br><span style="color:var(--mut)">${esc(n.descricao)}</span>${n.fotoId ? ` · <button class="sbtn" data-act="det" data-id="${n.inspecaoId}">ver foto</button>` : ''}
+   <br>${n.mondayUrl ? `<a class="sbtn" style="display:inline-flex;align-items:center;margin-top:4px;text-decoration:none;color:#1F3A5F;background:var(--bl);border-color:#9DB4D3" href="${esc(n.mondayUrl)}" target="_blank" rel="noopener">Ver no Monday ↗</a>`
+     : MONDAY?.ativo ? `<button class="sbtn" style="margin-top:4px" data-act="nc-monday" data-id="${n.id}" ${MONDAY_ENVIANDO.has(n.id) ? 'disabled' : ''}>${MONDAY_ENVIANDO.has(n.id) ? 'Enviando…' : 'Enviar ao Monday'}</button>${n.mondayErro ? ` <span style="color:#8C1D18;font-size:12px" title="${esc(n.mondayErro)}">falhou no envio automático</span>` : ''}` : ''}</td>
    <td>${esc(n.operador?.nome)}</td>
    <td style="white-space:nowrap">${n.status === 'aberta' ? (D.osEdit === n.id ? `<input class="inp" style="width:100px" inputmode="numeric" data-in="osVal" value="${esc(D.osVal)}" placeholder="Nº OS" aria-label="Número da OS no Nectar"> <button class="sbtn pri" data-act="os-salvar" data-id="${n.id}">Salvar</button> <button class="sbtn" data-act="os-cancelar">×</button>` : `<span class="pill p-n">ABERTA</span> <button class="sbtn" data-act="os-editar" data-id="${n.id}">Registrar OS</button> <button class="sbtn" data-act="nc-resolver" data-id="${n.id}">Resolvida</button>`)
      : n.status === 'os' ? `<span class="pill p-b">OS ${esc(n.os)}</span> <button class="sbtn" data-act="nc-resolver" data-id="${n.id}">Resolvida</button>`
@@ -221,7 +224,26 @@ function tColaboradores() {
   <div class="scroll"><table class="t"><thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th>${adm ? '<th></th>' : ''}</tr></thead><tbody>
   ${lista.length ? lista.map(([m, c]) => `<tr><td>${esc(m)}</td><td>${esc(c.nome)}</td><td><span class="pill ${c.ativo === false ? 'p-n' : 'p-ok'}">${c.ativo === false ? 'INATIVO' : 'ATIVO'}</span></td>${adm ? `<td><button class="sbtn" data-act="col-ativo" data-m="${esc(m)}">${c.ativo === false ? 'Reativar' : 'Desativar'}</button></td>` : ''}</tr>`).join('') : `<tr><td colspan="4" style="color:var(--mut)">Nenhum colaborador cadastrado.</td></tr>`}
   </tbody></table></div>
-  <span style="font-size:13px;color:var(--mut)">Colaborador desativado não consegue mais entrar no tablet, mas o histórico dele continua guardado.</span></div>`;
+  <span style="font-size:13px;color:var(--mut)">Colaborador desativado não consegue mais entrar no tablet, mas o histórico dele continua guardado.</span></div>
+  ${tMonday()}`;
+}
+function tMonday() {
+  const adm = PERFIL === 'admin';
+  const c = MONDAY || {};
+  return `<div class="panel"><h3>Integração com o Monday <span class="pill ${c.ativo && c.url ? 'p-ok' : 'p-n'}">${c.ativo && c.url ? 'ATIVA' : 'DESLIGADA'}</span></h3>
+  <span style="font-size:14px;color:#3F4A44">Cada item em Atenção/Crítico enviado pelo tablet vira um item no quadro <b>Não Conformidades – Pá Mecânica 838T</b> do Monday, que notifica os responsáveis. O envio passa pelo "carteiro" do Google Apps Script (passo a passo no README).</span>
+  ${adm ? `<form id="f-monday" style="display:grid;grid-template-columns:1fr 220px auto auto;gap:8px;align-items:center">
+   <input class="inp" id="m-url" placeholder="URL do app da Web do Apps Script (termina em /exec)" value="${esc(c.url || '')}" required>
+   <input class="inp" id="m-seg" placeholder="Senha do carteiro (SEGREDO)" value="${esc(c.segredo || '')}" required>
+   <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="m-ativo" ${c.ativo ? 'checked' : ''}> Ativo</label>
+   <button class="sbtn pri" type="submit">Salvar</button></form>
+   <div style="display:flex;gap:8px;align-items:center"><button class="sbtn" data-act="monday-testar" ${c.url ? '' : 'disabled'}>Testar conexão</button><span style="font-size:13px;color:var(--mut)">O teste confere a URL e a senha, sem criar item no Monday.</span></div>`
+    : '<span style="color:var(--mut);font-size:14px">Somente o administrador altera esta configuração.</span>'}</div>`;
+}
+async function chamarCarteiro(itens) {
+  if (!MONDAY?.url || !MONDAY?.segredo) throw new Error('Integração não configurada');
+  const r = await fetch(MONDAY.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ segredo: MONDAY.segredo, itens }) });
+  const j = await r.json(); if (!j.ok) throw new Error(j.erro || 'falha no carteiro'); return j;
 }
 function tGaveta() {
   if (!D.det) return '';
@@ -307,6 +329,19 @@ document.addEventListener('click', async e => {
     else if (a === 'nc-resolver') await updateDoc(doc(db, 'naoConformidades', id), { status: 'resolvida', atualizadoEm: serverTimestamp(), atualizadoPor: NOME || USER.email });
     else if (a === 'col-ativo') { const m = el.dataset.m; const c = COL.get(m); await updateDoc(doc(db, 'colaboradores', m), { ativo: c.ativo === false }); }
     else if (a === 'excel') { exportarExcel(); return; }
+    else if (a === 'monday-testar') { const j = await chamarCarteiro([]); D.msg = j.ok ? 'Conexão com o Monday OK: URL e senha corretas.' : 'Falhou.'; }
+    else if (a === 'nc-monday') {
+      const n = todasNC().find(x => x.id === id); if (!n) return;
+      MONDAY_ENVIANDO.add(id); render();
+      try {
+        const ins = acharInspecao(n.inspecaoId);
+        const j = await chamarCarteiro([{ ncId: n.id, rotulo: n.rotulo, gravidade: n.gravidade, descricao: n.descricao, grupo: n.grupo, turno: n.turno, dataTurno: n.dataTurno,
+          operador: `${n.operador?.nome} (${n.operador?.matricula})`, horimetro: ins?.horimetro ?? null, inspecaoId: n.inspecaoId, temFoto: !!n.fotoId }]);
+        const x = (j.res || [])[0];
+        if (x?.mondayId) { await updateDoc(doc(db, 'naoConformidades', id), { mondayId: String(x.mondayId), mondayUrl: `${j.url}/pulses/${x.mondayId}` }); D.msg = 'Enviado ao Monday.'; }
+        else D.msg = 'O Monday recusou: ' + (x?.erro || 'erro desconhecido');
+      } finally { MONDAY_ENVIANDO.delete(id); }
+    }
   } catch (err) { console.error(err); D.msg = 'Não foi possível salvar: ' + (err.code || err.message); }
   render();
 });
@@ -322,6 +357,11 @@ document.addEventListener('submit', async e => {
     ERRO = '';
     try { await signInWithEmailAndPassword(auth, document.getElementById('em').value.trim(), document.getElementById('pw').value); }
     catch (err) { ERRO = 'E-mail ou senha incorretos.'; render(); }
+  } else if (e.target.id === 'f-monday') {
+    const url = document.getElementById('m-url').value.trim(), segredo = document.getElementById('m-seg').value.trim(), ativo = document.getElementById('m-ativo').checked;
+    try { await setDoc(doc(db, 'config', 'monday'), { url, segredo, ativo, atualizadoEm: serverTimestamp(), atualizadoPor: NOME || USER.email }); D.msg = 'Integração com o Monday salva.'; }
+    catch (err) { D.msg = 'Não foi possível salvar: ' + (err.code || err.message); }
+    render();
   } else if (e.target.id === 'f-col') {
     const m = document.getElementById('c-mat').value.replace(/\D/g, ''), nome = document.getElementById('c-nome').value.trim();
     if (!m || !nome) return;

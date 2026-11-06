@@ -91,6 +91,34 @@ Toda alteração enviada ao GitHub é publicada sozinha em 1 a 2 minutos. No tab
 
 ---
 
+## Integração com o Monday (não conformidades → quadro do Monday)
+
+Cada item marcado como **Atenção** ou **Crítico** no tablet vira um item no quadro **"Não Conformidades – Pá Mecânica 838T"** do Monday, no workspace *Planejamento & Controle da Manutenção*. Uma automação do próprio Monday notifica os responsáveis assim que o item é criado.
+
+O envio passa por um **"carteiro" no Google Apps Script** (gratuito). Assim, o token do Monday fica guardado no Google, nunca no GitHub nem no tablet.
+
+### Instalação (uma única vez)
+1. **Token do Monday:** no Monday, clique na sua foto → **Developers** → **My access tokens** → **Show** → copie.
+2. **Criar o carteiro:** acesse <https://script.google.com> → **Novo projeto**. Apague o conteúdo e cole todo o arquivo **`integracao/monday-apps-script.gs`**. Salve (ícone de disquete) com o nome `Carteiro Checklist 838T`.
+3. **Guardar o token e a senha:** clique na engrenagem **Configurações do projeto** → **Propriedades do script** → **Adicionar propriedade**:
+   - `MONDAY_TOKEN` = o token copiado no passo 1
+   - `SEGREDO` = uma senha inventada (ex.: `pcm838t-2026-xyz`)
+   - Clique em **Salvar propriedades do script**.
+4. **Testar:** volte ao editor, escolha a função **`testar`** no menu do topo e clique em **Executar**. Na primeira vez o Google pede autorização: *Revisar permissões → sua conta → Avançado → Acessar (não seguro) → Permitir*. Um item "TESTE" deve aparecer no quadro do Monday (pode excluir).
+5. **Publicar:** clique em **Implantar → Nova implantação** → engrenagem → **App da Web**:
+   - *Executar como:* **Eu**
+   - *Quem pode acessar:* **Qualquer pessoa**
+   - Clique em **Implantar** e copie a **URL do app da Web** (termina em `/exec`).
+6. **Ligar no painel:** no painel, abra a aba **Configurações → Integração com o Monday**. Cole a URL, digite o mesmo `SEGREDO`, marque **Ativo** e clique em **Salvar**. Depois clique em **Testar conexão**.
+
+### Como funciona
+- O tablet envia as não conformidades logo após o checklist. Se a internet falhar, elas ficam numa fila no tablet e são reenviadas a cada 3 minutos.
+- No painel, cada não conformidade mostra **"Ver no Monday ↗"**. Se o envio automático falhou, aparece o botão **"Enviar ao Monday"** para mandar manualmente.
+- Notificações: são configuradas no Monday (quadro → **Automatizar**). Já existe uma automação que avisa o Gean a cada item novo. Para avisar outras pessoas, edite essa automação ou crie outra (ex.: "quando Gravidade mudar para Crítico, notificar…").
+- Se você alterar o código do carteiro, use **Implantar → Gerenciar implantações → editar → Nova versão**, para manter a mesma URL.
+
+---
+
 ## Estrutura
 
 ```
@@ -116,6 +144,7 @@ manifest.webmanifest    ícone e tela cheia no tablet
 | `inspecoes` | cada checklist enviado: turno, operador, horímetro, respostas, pneus, rotinas, status |
 | `naoConformidades` | cada item em Atenção/Crítico, com situação (aberta, OS, resolvida) e nº da OS |
 | `fotos` | fotos comprimidas dos problemas |
+| `config` | configurações (ex.: `monday`: URL do carteiro, senha, ativo) |
 | `status` | resumo da última inspeção, mostrado na tela inicial do tablet |
 
 ### Limites do plano gratuito (Spark)

@@ -51,8 +51,11 @@ service cloud.firestore {
         && request.resource.data.criadoEm == request.time;
       allow read: if ehSupervisor();
       allow update: if ehSupervisor()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'os', 'atualizadoEm', 'atualizadoPor'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'os', 'atualizadoEm', 'atualizadoPor', 'mondayId', 'mondayUrl', 'mondayErro'])
         && request.resource.data.status in ['aberta', 'os', 'resolvida'];
+      // o tablet só pode anotar o resultado do envio ao Monday nas NCs que ele mesmo criou
+      allow update: if ehTablet() && resource.data.criadoPor == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mondayId', 'mondayUrl', 'mondayErro']);
       allow delete: if ehAdmin();
     }
 
@@ -61,6 +64,12 @@ service cloud.firestore {
       allow create: if ehTablet() && request.resource.data.criadoPor == request.auth.uid;
       allow read: if ehSupervisor();
       allow delete: if ehAdmin();
+    }
+
+    // Configurações (ex.: integração com o Monday). Só o admin altera.
+    match /config/{id} {
+      allow read: if ehTablet() || ehSupervisor();
+      allow write: if ehAdmin();
     }
 
     // Resumo da última inspeção (mostrado na tela inicial do tablet).
