@@ -9,7 +9,7 @@ import {
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js';
-import { firebaseConfig } from './firebase-config.js?v=20261106c';
+import { firebaseConfig } from './firebase-config.js?v=20261109a';
 
 export const configurado = !String(firebaseConfig.apiKey || '').startsWith('COLE');
 

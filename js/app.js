@@ -4,9 +4,9 @@
 import {
   configurado, db, auth, collection, doc, getDoc, updateDoc, writeBatch, serverTimestamp,
   onSnapshot, signInWithEmailAndPassword, signOut, onAuthStateChanged
-} from './firebase.js?v=20261106c';
-import { CHECKLIST } from './checklist-838t.js?v=20261106c';
-import { turnoDe, TURNOS } from './turnos.js?v=20261106c';
+} from './firebase.js?v=20261109a';
+import { CHECKLIST } from './checklist-838t.js?v=20261109a';
+import { turnoDe, TURNOS } from './turnos.js?v=20261109a';
 
 const EQ = CHECKLIST.equipamento;
 const ETAPAS = [{ id: 'abertura', titulo: 'Abertura do turno', tipo: 'abertura' }, ...CHECKLIST.etapas];
@@ -14,7 +14,7 @@ const PNEUS = CHECKLIST.pneus;
 const LBL = { ok: 'OK', a: 'Atenção', c: 'Crítico' };
 const INATIVIDADE_MIN = 10;       // volta para a matrícula após 10 min parado
 const SEG_VOLTAR = 8;             // segundos na tela "Enviado"
-const VERSAO = '20261106c';            // igual ao versao.json; troque os dois ao publicar mudanças
+const VERSAO = '20261109a';            // igual ao versao.json; troque os dois ao publicar mudanças
 
 let S;                            // estado da inspeção em andamento
 let USER = null, PERFIL = null;   // conta do tablet
@@ -51,7 +51,7 @@ function respOk(x) { return x && x.s && (x.s === 'ok' || (x.obs || '').trim() !=
 function etapaCompleta(i) {
   const e = ETAPAS[i];
   if (e.tipo === 'abertura') return String(S.hor).trim() !== '' && Number(S.hor) > 0 && S.lenha;
-  if (e.tipo === 'rotinas') return true;
+  if (e.tipo === 'rotinas') return e.itens.every(it => { const v = S.rotinas[it.id]; return typeof v === 'number' || (v && v.nf && v.motivo.trim() !== ''); });
   const itensOk = e.itens.every(it => respOk(S.resp[it.id]));
   if (e.tipo === 'pneus') return itensOk && Object.keys(PNEUS).every(p => respOk(S.pneus[p]));
   return itensOk;
@@ -157,8 +157,18 @@ function tEtapa() {
     <label class="card chk"><input type="checkbox" data-in="lenha" ${S.lenha ? 'checked' : ''}><span>Li e estou ciente: ${esc(CHECKLIST.aviso.charAt(0).toLowerCase() + CHECKLIST.aviso.slice(1))}.</span></label>
     ${S.tentou && !S.lenha ? '<span class="err">Marque a ciência do aviso para continuar.</span>' : ''}`;
   } else if (e.tipo === 'rotinas') {
-    corpo = `<div class="note" style="background:#fff;border:1px solid var(--bd)">Toque em <b>Feito</b> quando terminar. A hora é gravada automaticamente. Se ainda não fez, pode deixar pendente.</div>` +
-      e.itens.map(it => { const v = S.rotinas[it.id]; return `<div class="card task"><span style="display:flex;flex-direction:column;gap:2px"><b style="font-size:19px">${esc(it.rotulo)}</b>${it.dica ? `<span style="font-size:15px;color:var(--mut)">${esc(it.dica)}</span>` : ''}</span><button type="button" class="tbtn${v ? ' on' : ''}" data-act="rotina" data-k="${it.id}">${v ? 'Feito ' + hm(new Date(v)) : 'Feito'}</button></div>`; }).join('');
+    corpo = `<div class="note" style="background:#fff;border:1px solid var(--bd)">Para cada rotina, toque em <b>Feito</b> (a hora é gravada automaticamente) ou em <b>Não feito</b> e informe o motivo.</div>` +
+      e.itens.map(it => {
+        const v = S.rotinas[it.id], feito = typeof v === 'number', nf = !!(v && v.nf);
+        const falta = S.tentou && !feito && !(nf && v.motivo.trim());
+        return `<div class="card item ${nf ? 'a' : ''}"><span style="display:flex;flex-direction:column;gap:2px"><b style="font-size:19px">${esc(it.rotulo)}</b>${it.dica ? `<span style="font-size:15px;color:var(--mut)">${esc(it.dica)}</span>` : ''}</span>
+        <div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="Situação da rotina">
+          <button type="button" class="ok${feito ? ' on' : ''}" aria-pressed="${feito}" data-act="rotina" data-k="${it.id}">${feito ? '✓ Feito ' + hm(new Date(v)) : 'Feito'}</button>
+          <button type="button" class="a${nf ? ' on' : ''}" aria-pressed="${nf}" data-act="rotina-nf" data-k="${it.id}">${nf ? '✗ ' : ''}Não feito</button>
+        </div>
+        ${nf ? `<label class="lb" for="m-${it.id}" style="color:#6B4100">Por que não foi feito? (obrigatório)</label><textarea id="m-${it.id}" rows="2" data-in="motivo" data-k="${it.id}" placeholder="Ex.: máquina em manutenção">${esc(v.motivo)}</textarea>` : ''}
+        ${falta ? `<span class="err">${nf ? 'Informe o motivo.' : 'Marque Feito ou Não feito.'}</span>` : ''}</div>`;
+      }).join('');
   } else {
     if (e.tipo === 'pneus') {
       const p = S.pneuSel, x = S.pneus[p];
@@ -184,7 +194,7 @@ function tResumo() {
   <div class="kpis"><div class="kpi" style="background:var(--gl);color:var(--g2)"><b>${t.ok}</b>OK</div><div class="kpi" style="background:var(--yl);color:var(--yt)"><b>${t.a}</b>Atenção</div><div class="kpi" style="background:var(--rl);color:var(--r)"><b>${t.c}</b>Crítico</div></div>
   <div style="background:${bloq ? '#B3261E' : '#1E6B3C'};color:#fff;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column"><span class="ht" style="font-size:30px">${bloq ? 'MÁQUINA BLOQUEADA' : 'MÁQUINA LIBERADA'}</span><span style="font-size:17px">${bloq ? 'Não operar. Avise o supervisor imediatamente.' : t.a ? 'Itens em atenção serão enviados para o PCM.' : 'Tudo em ordem.'}</span></div>
   ${t.prob.length ? `<div class="card"><b style="font-size:18px">Itens com problema</b>${t.prob.map(p => `<div style="display:flex;gap:10px;font-size:17px"><span class="pill ${p.s === 'c' ? 'p-c' : 'p-a'}" style="align-self:flex-start">${p.s === 'c' ? 'C' : 'A'}</span><span><b>${esc(p.rotulo)}</b> · ${esc(p.obs)}${p.foto ? ' (com foto)' : ''}</span></div>`).join('')}</div>` : ''}
-  <div class="card"><b style="font-size:18px">Rotinas do turno</b>${rot.map(r => `<div style="display:flex;justify-content:space-between;gap:8px;font-size:17px"><span>${esc(r.rotulo)}</span><span class="pill ${S.rotinas[r.id] ? 'p-ok' : 'p-a'}">${S.rotinas[r.id] ? hm(new Date(S.rotinas[r.id])) : 'PENDENTE'}</span></div>`).join('')}</div>
+  <div class="card"><b style="font-size:18px">Rotinas do turno</b>${rot.map(r => `<div style="display:flex;justify-content:space-between;gap:8px;font-size:17px"><span>${esc(r.rotulo)}</span>${typeof S.rotinas[r.id] === 'number' ? `<span class="pill p-ok">${hm(new Date(S.rotinas[r.id]))}</span>` : `<span class="pill p-a" title="${esc(S.rotinas[r.id]?.motivo)}">NÃO FEITO</span>`}</div>${S.rotinas[r.id]?.nf ? `<div style="font-size:15px;color:#6B4100;margin-top:-6px">Motivo: ${esc(S.rotinas[r.id].motivo)}</div>` : ''}`).join('')}</div>
   <label class="lb" for="og">Observações gerais (opcional)</label><textarea id="og" rows="2" data-in="obsg" placeholder="Algo mais que o PCM precisa saber?">${esc(S.obsg)}</textarea>
   <label class="chk"><input type="checkbox" data-in="decl" ${S.decl ? 'checked' : ''}><span>Declaro que fiz esta inspeção pessoalmente, com a máquina parada.</span></label>
   ${S.tentou && !S.decl ? '<span class="err">Marque a declaração para enviar.</span>' : ''}
@@ -229,12 +239,17 @@ async function enviar() {
   });
   const resp = {}; Object.entries(S.resp).forEach(([k, x]) => { resp[k] = { s: x.s, obs: (x.obs || '').trim() }; });
   const pneus = {}; Object.entries(S.pneus).forEach(([k, x]) => { pneus[k] = { s: x.s, obs: (x.obs || '').trim() }; });
-  const rot = {}; ETAPAS.filter(e => e.tipo === 'rotinas').flatMap(e => e.itens).forEach(r => { rot[r.id] = S.rotinas[r.id] ? hm(new Date(S.rotinas[r.id])) : null; });
+  const rot = {}, rotNaoFeitas = {};
+  ETAPAS.filter(e => e.tipo === 'rotinas').flatMap(e => e.itens).forEach(r => {
+    const v = S.rotinas[r.id];
+    rot[r.id] = typeof v === 'number' ? hm(new Date(v)) : null;
+    if (v && v.nf) rotNaoFeitas[r.id] = v.motivo.trim();
+  });
   const status = t.c ? 'BLOQUEADA' : 'LIBERADA';
   lote.set(insRef, {
     equipamento: EQ, checklistVersao: CHECKLIST.versao, dataTurno, turno,
     criadoEm: serverTimestamp(), horaTablet: agora.toISOString(), criadoPor: uid,
-    operador, horimetro: Number(S.hor), respostas: resp, pneus, rotinas: rot,
+    operador, horimetro: Number(S.hor), respostas: resp, pneus, rotinas: rot, rotinasNaoFeitas: rotNaoFeitas,
     observacoes: S.obsg.trim(), contagem: { ok: t.ok, a: t.a, c: t.c }, status, problemas
   });
   const paraMonday = [];
@@ -339,7 +354,8 @@ document.addEventListener('click', e => {
   else if (a === 'pneu') { S.pneuSel = el.dataset.p; }
   else if (a === 'foto') { fotoAlvo = { tipo: el.dataset.tipo, k }; document.getElementById('camera').click(); return; }
   else if (a === 'tirar-foto') { const alvo = el.dataset.tipo === 'pneu' ? S.pneus[k] : S.resp[k]; if (alvo) alvo.foto = null; }
-  else if (a === 'rotina') { S.rotinas[k] = S.rotinas[k] ? null : Date.now(); }
+  else if (a === 'rotina') { S.rotinas[k] = typeof S.rotinas[k] === 'number' ? null : Date.now(); }
+  else if (a === 'rotina-nf') { S.rotinas[k] = S.rotinas[k]?.nf ? null : { nf: true, motivo: '' }; }
   else if (a === 'proximo') {
     if (!etapaCompleta(S.etapa)) { S.tentou = true; render(); return; }
     S.tentou = false; if (S.etapa < ETAPAS.length - 1) S.etapa++; else TELA = 'resumo';
@@ -357,7 +373,8 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   ultimoToque = Date.now();
   const el = e.target, f = el.dataset.in; if (!f) return;
-  if (f === 'obs') { const alvo = el.dataset.tipo === 'pneu' ? S.pneus : S.resp; if (alvo[el.dataset.k]) alvo[el.dataset.k].obs = el.value; }
+  if (f === 'motivo') { if (S.rotinas[el.dataset.k]?.nf) S.rotinas[el.dataset.k].motivo = el.value; }
+  else if (f === 'obs') { const alvo = el.dataset.tipo === 'pneu' ? S.pneus : S.resp; if (alvo[el.dataset.k]) alvo[el.dataset.k].obs = el.value; }
   else if (f === 'lenha' || f === 'decl') S[f] = el.checked;
   else S[f] = el.value;
 });

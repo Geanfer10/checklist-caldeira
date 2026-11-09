@@ -4,9 +4,9 @@
 import {
   configurado, db, auth, collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp,
   query, where, onSnapshot, Timestamp, signInWithEmailAndPassword, signOut, onAuthStateChanged
-} from './firebase.js?v=20261106c';
-import { CHECKLIST, itensAvaliados, rotinas } from './checklist-838t.js?v=20261106c';
-import { TURNOS, LISTA_TURNOS, iso, deIso, somaDias, inicioTurno, fimTurno } from './turnos.js?v=20261106c';
+} from './firebase.js?v=20261109a';
+import { CHECKLIST, itensAvaliados, rotinas } from './checklist-838t.js?v=20261109a';
+import { TURNOS, LISTA_TURNOS, iso, deIso, somaDias, inicioTurno, fimTurno } from './turnos.js?v=20261109a';
 
 const EQ = CHECKLIST.equipamento;
 const DAY = 86400000;
@@ -18,6 +18,8 @@ const dmy = s => { const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
 const cor = s => s === 'ok' ? '#1E6B3C' : s === 'a' ? '#F5B800' : s === 'c' ? '#B3261E' : '#FFFFFF';
 const corTxt = s => (s === 'a' || !s) ? '#1A1F1C' : '#FFFFFF';
 const LBL = { ok: 'OK', a: 'Atenção', c: 'Crítico' };
+// texto de uma rotina: hora em que foi feita, "Não feito (motivo)" ou "pendente" (registros antigos)
+const rotTxt = (r, id) => r.rotinas?.[id] ? r.rotinas[id] : r.rotinasNaoFeitas?.[id] !== undefined ? 'Não feito' + (r.rotinasNaoFeitas[id] ? ' (' + r.rotinasNaoFeitas[id] + ')' : '') : 'pendente';
 const pillSt = r => r.contagem?.c ? ['p-c', 'BLOQUEADA'] : r.contagem?.a ? ['p-a', 'ATENÇÃO'] : ['p-ok', 'OK'];
 const ico = {
   dl: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
@@ -182,7 +184,7 @@ ${top.length ? `<div class="hbars">${top.map(([t, c]) => `<div class="hb"><span>
 </div>
 <div class="panel"><h3>Histórico de inspeções <small>clique numa linha para ver o checklist</small></h3>
 <div class="scroll"><table class="t"><thead><tr><th>Data</th><th>Turno</th><th>Operador</th><th>Horímetro</th><th>OK</th><th>Atenção</th><th>Crítico</th><th>Ventoinha</th><th>Status</th></tr></thead><tbody>
-${recs.length ? recs.slice(0, 200).map(r => { const [c, l] = pillSt(r); return `<tr class="click" data-act="det" data-id="${r.id}"><td>${dm(quando(r))} ${hm(quando(r))}</td><td>${esc(r.turno)}</td><td>${esc(r.operador?.nome)} <span style="color:var(--mut)">${esc(r.operador?.matricula)}</span></td><td>${esc(r.horimetro)} h</td><td>${r.contagem?.ok ?? ''}</td><td>${r.contagem?.a || '–'}</td><td>${r.contagem?.c || '–'}</td><td>${r.rotinas?.ventoinha ? 'Feita ' + esc(r.rotinas.ventoinha) : '<span style="color:var(--yt);font-weight:600">Pendente</span>'}</td><td><span class="pill ${c}">${l}</span></td></tr>`; }).join('') : '<tr><td colspan="9" style="color:var(--mut)">Nenhuma inspeção no período.</td></tr>'}
+${recs.length ? recs.slice(0, 200).map(r => { const [c, l] = pillSt(r); return `<tr class="click" data-act="det" data-id="${r.id}"><td>${dm(quando(r))} ${hm(quando(r))}</td><td>${esc(r.turno)}</td><td>${esc(r.operador?.nome)} <span style="color:var(--mut)">${esc(r.operador?.matricula)}</span></td><td>${esc(r.horimetro)} h</td><td>${r.contagem?.ok ?? ''}</td><td>${r.contagem?.a || '–'}</td><td>${r.contagem?.c || '–'}</td><td>${r.rotinas?.ventoinha ? 'Feita ' + esc(r.rotinas.ventoinha) : `<span style="color:var(--yt);font-weight:600">${r.rotinasNaoFeitas?.ventoinha !== undefined ? 'Não feita' : 'Pendente'}</span>`}</td><td><span class="pill ${c}">${l}</span></td></tr>`; }).join('') : '<tr><td colspan="9" style="color:var(--mut)">Nenhuma inspeção no período.</td></tr>'}
 </tbody></table></div></div>`;
 }
 function tDiario() {
@@ -206,7 +208,7 @@ function tDiario() {
     <span style="font-size:13px;color:var(--mut)">${TURNOS[t].rotulo}</span>
     <span style="font-size:15px"><b>${hm(quando(r))}</b> · ${esc(r.operador?.nome)} · ${esc(r.horimetro)} h</span>
     ${(r.problemas || []).length ? r.problemas.map(p => `<span style="font-size:14px"><span class="pill ${p.s === 'c' ? 'p-c' : 'p-a'}" style="padding:1px 7px">${p.s === 'c' ? 'C' : 'A'}</span> ${esc(p.rotulo)} · <span style="color:var(--mut)">${esc(p.obs)}</span></span>`).join('') : '<span style="font-size:14px;color:var(--g2)">Todos os itens OK</span>'}
-    <span style="font-size:13px;color:var(--mut)">${rotinas().map(x => `${esc(x.rotulo)}: ${r.rotinas?.[x.id] ? esc(r.rotinas[x.id]) : 'pendente'}`).join(' · ')}</span>
+    <span style="font-size:13px;color:var(--mut)">${rotinas().map(x => `${esc(x.rotulo)}: ${esc(rotTxt(r, x.id))}`).join(' · ')}</span>
     ${l.length > 1 ? `<span style="font-size:13px;color:var(--mut)">+ ${l.length - 1} outro${l.length > 2 ? 's' : ''} checklist${l.length > 2 ? 's' : ''} neste turno (ver histórico)</span>` : ''}
     <button class="sbtn" data-act="det" data-id="${r.id}" style="align-self:flex-start">Abrir checklist</button></div>`;
   };
@@ -260,7 +262,7 @@ function tGaveta() {
   <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill ${c}">${l}</span><span class="pill p-n">${esc(r.operador?.nome)} · ${esc(r.operador?.matricula)}</span><span class="pill p-n">Enviado ${dm(quando(r))} ${hm(quando(r))}</span><span class="pill p-n">Horímetro ${esc(r.horimetro)} h</span></div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center"><div class="aviso" style="background:var(--gl);color:var(--g2)"><b style="font-size:26px">${r.contagem?.ok ?? 0}</b><br>OK</div><div class="aviso" style="background:var(--yl);color:var(--yt)"><b style="font-size:26px">${r.contagem?.a ?? 0}</b><br>Atenção</div><div class="aviso" style="background:var(--rl);color:var(--r)"><b style="font-size:26px">${r.contagem?.c ?? 0}</b><br>Crítico</div></div>
   <div><b>Itens</b>${linhas}</div>
-  <div><b>Rotinas do turno</b>${rotinas().map(x => `<div class="linha"><span>${esc(x.rotulo)}</span><span class="pill ${r.rotinas?.[x.id] ? 'p-ok' : 'p-a'}">${r.rotinas?.[x.id] ? esc(r.rotinas[x.id]) : 'PENDENTE'}</span></div>`).join('')}</div>
+  <div><b>Rotinas do turno</b>${rotinas().map(x => `<div class="linha"><span>${esc(x.rotulo)}</span><span class="pill ${r.rotinas?.[x.id] ? 'p-ok' : 'p-a'}" style="white-space:normal;text-align:right">${r.rotinas?.[x.id] ? esc(r.rotinas[x.id]) : r.rotinasNaoFeitas?.[x.id] !== undefined ? 'NÃO FEITO' : 'PENDENTE'}</span></div>${r.rotinasNaoFeitas?.[x.id] ? `<div style="font-size:13px;color:#6B4100;padding:0 0 6px">Motivo: ${esc(r.rotinasNaoFeitas[x.id])}</div>` : ''}`).join('')}</div>
   ${r.observacoes ? `<div><b>Observações</b><p style="margin:6px 0">${esc(r.observacoes)}</p></div>` : ''}
   <span class="rodape">Checklist versão ${esc(r.checklistVersao)} · ID ${esc(r.id)}</span>
   </div></div>`;
@@ -294,7 +296,7 @@ async function exportarExcel() {
     const linhas = recs.map(r => {
       const o = { 'Data do turno': dmy(r.dataTurno), 'Turno': r.turno, 'Enviado em': quando(r).toLocaleString('pt-BR'), 'Matrícula': r.operador?.matricula, 'Operador': r.operador?.nome, 'Horímetro (h)': r.horimetro, 'Status': pillSt(r)[1], 'OK': r.contagem?.ok, 'Atenção': r.contagem?.a, 'Crítico': r.contagem?.c };
       itens.forEach(it => { const x = it.pneu ? r.pneus?.[it.pneu] : r.respostas?.[it.id]; o[it.rotulo] = x?.s ? LBL[x.s] + (x.obs ? ' - ' + x.obs : '') : ''; });
-      rot.forEach(x => { o[x.rotulo] = r.rotinas?.[x.id] || 'pendente'; });
+      rot.forEach(x => { o[x.rotulo] = rotTxt(r, x.id); });
       o['Observações'] = r.observacoes || ''; return o;
     });
     const ncs = todasNC().filter(n => n.dataTurno >= inicioPeriodo()).sort((a, b) => quando(a) - quando(b)).map(n => ({
